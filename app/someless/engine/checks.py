@@ -5,6 +5,7 @@ warnings (mail may go out, but land in spam or bounce), and so are the ports mai
 and whoever answers has to say what the mail engine itself says. Also what the server name
 itself needs, for Settings > Mail server name (name_checks)."""
 import socket
+import os
 import ssl
 import time
 from concurrent.futures import ThreadPoolExecutor
@@ -193,7 +194,7 @@ def run_checks(address):
     found.append(_cached("port25", lambda: Check("port25", "Outgoing port 25", "ok", "") if port25_open() else Check(
         "port25", "Outgoing port 25", "warning",
         "Your VPS provider blocks outgoing port 25. Ask them to open it; mail can't reach other servers until then.")))
-    if engine_up and (name or address):   # with the engine down, nothing would answer anyway
+    if engine_up and (name or address) and os.environ.get("SOMELESS_OUTBOUND_ONLY") != "1":   # with the engine down, nothing would answer anyway
         found.extend(_cached(f"incoming {name or address}", lambda: _incoming(name or address)))
     if name and address:
         ptr = _cached(f"ptr {address}", lambda: reverse_name(address))

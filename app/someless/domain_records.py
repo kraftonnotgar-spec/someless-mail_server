@@ -18,6 +18,7 @@ is taken, this server takes the next free name.
 import base64
 import ipaddress
 import json
+import os
 import re
 import secrets
 import socket
@@ -200,6 +201,8 @@ def records(domain, keys, address):
     ]
     receiving = make("mx", "MX record", "Sends the domain's incoming mail to this server.",
                      "MX", "@", mail_host, priority=10)
+    if os.environ.get("SOMELESS_OUTBOUND_ONLY") == "1":
+        authenticating = [record for record in authenticating if record.key != "a"]
     return authenticating, receiving
 
 
@@ -257,6 +260,8 @@ def receive_note(domain, keys):
     """What's still to do about the MX record, as things are now (what other services have is in
     summary()). None once the domain's mail comes here, and only here: receive_tip() says how
     that works, on the MX card."""
+    if os.environ.get("SOMELESS_OUTBOUND_ONLY") == "1":
+        return "Outgoing-only server: keep your existing MX records and incoming mail provider unchanged."
     found = found_in(keys)
     mail_host = _mail_host(domain, keys)
     elsewhere = _join(_receivers([server for server in found["mx"] if server != mail_host]))
@@ -301,7 +306,8 @@ def zone_file(domain, keys, address):
              '; leave "Proxy imported DNS records" off: mail doesn\'t go through the proxy.',
              "; Lines that start with ; are notes: they aren't imported.",
              ""]
-    for record in [*authenticating, receiving]:
+    export_records = authenticating if os.environ.get("SOMELESS_OUTBOUND_ONLY") == "1" else [*authenticating, receiving]
+    for record in export_records:
         lines.append(f"; {record.title}: {record.hint[:1].lower()}{record.hint[1:]}")
         value = record.value or "YOUR.SERVER.IP.ADDRESS"
         if record.type == "TXT":
@@ -324,7 +330,7 @@ def zone_file(domain, keys, address):
         lines.append(f"; {line}" if kind in ("keep", "edit") or record.value is None else line)
         lines.append("")
     others = [server for server in found_in(keys)["mx"] if server != receiving.value]
-    if others:
+    if others and os.environ.get("SOMELESS_OUTBOUND_ONLY") != "1":
         lines.insert(-1, f"; Then delete your other MX records ({', '.join(others)}): "
                          "a domain's mail should go to one place.")
     return "\n".join(lines)
@@ -341,6 +347,8 @@ def summary(domain, keys, address):
     """What other mail services have on the domain, and what to do about it, for the end of the
     page: {"services", "todo": [{"kind", "text", "now"}], "clean": cleanup()}. None when there's
     nothing of theirs: the domain is ready to set up."""
+    if os.environ.get("SOMELESS_OUTBOUND_ONLY") == "1":
+        return None  # Existing incoming-provider records must be retained.
     found = found_in(keys)
     mail_host = _mail_host(domain, keys)
     authenticating, _ = records(domain, keys, address)
@@ -815,7 +823,8 @@ def _dkim_key(record):
 
 
 def authenticated(results):
-    return all(results.get(key, {}).get("state") == "found" for key in AUTHENTICATING)
+    required = ("code", "spf", "dkim", "dmarc") if os.environ.get("SOMELESS_OUTBOUND_ONLY") == "1" else AUTHENTICATING
+    return all(results.get(key, {}).get("state") == "found" for key in required)
 
 
 def save(domain_id, host, found, results=None):

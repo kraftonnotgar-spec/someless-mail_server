@@ -90,15 +90,20 @@
     <h2 class="dns-group-title" id="authenticate-title">Records that authenticate the domain</h2>
     {% if checked_ago %}<p class="dns-checked">Last checked {{ checked_ago }}</p>{% endif %}
   </div>
-  <p class="dns-group-hint">Safe to add now: they don't change where your mail goes. The MX record below is needed too.</p>
+  <p class="dns-group-hint">Safe to add now: they don't change where your mail goes. {% if not outbound_only %}The MX record below is needed too.{% endif %}</p>
   {% for record in records %}{{ dns_record(record, checks.get(record.key), loop.index) }}{% endfor %}
 </section>
 
+{% if outbound_only %}
+<p class="dns-group-hint">Outgoing-only server: keep your existing MX records and incoming mail provider unchanged.</p>
+{% else %}
 <section class="dns-group dns-group-receive" aria-labelledby="receive-title">
   <h2 class="dns-group-title" id="receive-title">Receive mail here</h2>
   {% if receive_note %}<p class="dns-warning">{{ receive_note }}</p>{% endif %}
   {{ dns_record(receiving, checks.get(receiving.key), records | length + 1, receive_tip) }}
 </section>
+
+{% endif %}
 
 {# The end of the page: what other mail services have on the domain (Zoho Mail, Brevo...),
    what to do with their records, and what to remove, when #}

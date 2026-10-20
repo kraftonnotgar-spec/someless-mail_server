@@ -1,0 +1,20 @@
+Domain: blueprintsolutions.co.tz
+Keep existing nameservers, MX records, mail records, and DMARC unchanged.
+TTL: 300 or existing default.
+
+EDIT the EXISTING root TXT SPF record (do not add a second SPF):
+Name: blueprintsolutions.co.tz
+Value: v=spf1 +a +mx +ip4:107.181.134.20 ip4:72.62.135.121 include:relay.mailchannels.net ~all
+
+ADD TXT:
+Name: blueprintsolutions.co.tz
+Value: someless-code:a3f1ff63b27b57d2fe9e8fecccfeb898
+
+ADD TXT:
+Name: someless._domainkey.blueprintsolutions.co.tz
+Value: v=DKIM1; k=rsa; p=MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA5TBXhOiHx/zAyyRcy4KDUnd1ECnuMSu1qHdOq+mkGo9zz/jSn8M9o+CgKJbfpYNFchVsx+wFFhOPw8Nx9tqeWoraZYkU/M7IjGKkaV3sI3ejwVliwcltdxnHnvyy2xBrRJWdAmKGUyjOMKy+GTwmlm/WTcVYYunHWK/njUo99LXKuzeCw0QEdH6SmurtxBy543IYpFjZ1upSnA1vOVnH7fy69c0iskVh2tNvRKoAnJ+Awa9dOViX8giJVMsgU3AxXHKymk9XqGs4Ywi/67qLsJOUKjIzyQvTYdv1lmDuNzb6femGW02JsOKoCcUmmw46XF4oQQYhp4TE6/zhOFK3VwIDAQAB
+
+DNS verified and outgoing-only mode deployed.
+Keep existing MX records and nameservers unchanged.
+SMTP configuration and per-address credentials: deployment-blueprint-smtp-credentials.json
+The existing cPanel incoming IMAP settings and passwords stay unchanged.

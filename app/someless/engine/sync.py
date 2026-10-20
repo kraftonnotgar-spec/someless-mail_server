@@ -10,6 +10,7 @@ import base64
 import contextlib
 import hashlib
 import logging
+import os
 import threading
 import time
 from pathlib import Path
@@ -104,6 +105,9 @@ def desired_state():
 
 def reconcile(engine, desired):
     done = []
+    outbound_only = os.environ.get("SOMELESS_OUTBOUND_ONLY") == "1"
+    if outbound_only and desired["mailboxes"]:
+        raise EngineError("Outgoing-only mode cannot host local mailboxes.")
     domains = {obj["name"]: obj for obj in engine.get("Domain")}
     internal_id = domains[INTERNAL_DOMAIN]["id"]
     # domains: every authenticated one
@@ -112,6 +116,20 @@ def reconcile(engine, desired):
             domains[name] = {"name": name, **engine.create("Domain", {
                 "name": name, "dkimManagement": MANUAL, "certificateManagement": MANUAL, "dnsManagement": MANUAL})}
             done.append(f"create Domain {name}")
+    # Outbound-only domains have no local mailboxes. Unknown recipients must follow
+    # their public MX, including messages addressed to colleagues at the same domain.
+    for name in desired["domains"]:
+        if bool(domains[name].get("allowRelaying")) != outbound_only:
+            engine.update("Domain", domains[name]["id"], {"allowRelaying": outbound_only})
+            done.append(f"update Domain {name} relay mode")
+    if outbound_only:
+        strategy = engine.get("MtaOutboundStrategy", ["singleton"])[0]
+        route = {"match": {"0": {"if": "rcpt_domain == 'someless.internal'", "then": "'local'"}}, "else": "'mx'"}
+        schedule = {"match": {"0": {"if": "source == 'dsn'", "then": "'dsn'"}}, "else": "'remote'"}
+        changes = {key: value for key, value in {"route": route, "schedule": schedule}.items() if strategy.get(key) != value}
+        if changes:
+            engine.update("MtaOutboundStrategy", "singleton", changes)
+            done.append("route outbound-only recipients through their public MX")
     # each domain's DKIM key: the one already published in its DNS
     signatures = engine.get("DkimSignature")
     signed = {(signature["domainId"], signature["selector"]) for signature in signatures}
@@ -274,6 +292,8 @@ def _certificate(engine, desired, domains, settings, done):
     """The server name's certificate: Let's Encrypt, HTTP-01 answered through the challenge
     relay; and the default one, for clients that don't say which name they want."""
     server_name = desired["server_name"]
+    if os.environ.get("SOMELESS_OUTBOUND_ONLY") == "1":
+        return  # TLS certificate is synchronized from the existing proxy by the deployment.
     if not server_name or not desired["acme_directory"]:
         return
     server_domain = server_name.split(".", 1)[1]

@@ -1,0 +1,52 @@
+services:
+  someless-mail:
+    image: ghcr.io/boyoftime/someless-mail:1.0.0
+    container_name: someless-mail
+    restart: unless-stopped
+    mem_limit: 768m
+    memswap_limit: 768m
+    cpus: 0.75
+    pids_limit: 192
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "2"
+    ports:
+      - "587:17587"
+      - "465:17465"
+    sysctls:
+      net.ipv4.ip_unprivileged_port_start: 0
+    environment:
+      SOMELESS_OUTBOUND_ONLY: "1"
+      SOMELESS_SMTP_HOSTNAME: email.krafton.my.id
+    volumes:
+      - ./overrides/domain_records.py:/opt/someless/app/someless/domain_records.py:ro
+      - ./overrides/names.py:/opt/someless/app/someless/engine/names.py:ro
+      - ./overrides/sync.py:/opt/someless/app/someless/engine/sync.py:ro
+      - ./overrides/domains.py:/opt/someless/app/someless/domains.py:ro
+      - ./overrides/checks.py:/opt/someless/app/someless/engine/checks.py:ro
+      - ./overrides/domain.html:/opt/someless/app/someless/templates/domain.html:ro
+      - ./data:/data
+    networks:
+      - mail
+      - proxy
+    labels:
+      traefik.enable: "true"
+      traefik.docker.network: n8n_default
+      traefik.http.routers.someless-panel.rule: Host(`email.krafton.my.id`)
+      traefik.http.routers.someless-panel.entrypoints: websecure
+      traefik.http.routers.someless-panel.tls.certresolver: mytlschallenge
+      traefik.http.routers.someless-panel.service: someless-panel
+      traefik.http.services.someless-panel.loadbalancer.server.port: "17080"
+      traefik.http.routers.someless-acme.rule: Host(`email.krafton.my.id`) && PathPrefix(`/.well-known/acme-challenge/`)
+      traefik.http.routers.someless-acme.entrypoints: websecure
+      traefik.http.routers.someless-acme.tls: "true"
+      traefik.http.routers.someless-acme.priority: "200"
+      traefik.http.routers.someless-acme.service: someless-acme
+      traefik.http.services.someless-acme.loadbalancer.server.port: "17081"
+networks:
+  mail:
+  proxy:
+    external: true
+    name: n8n_default

@@ -1,6 +1,7 @@
 """The mail domains: the part of an email address after the @. The admin adds them here and
 authenticates them with DNS records at their domain provider (domain_records.py)."""
 import json
+import os
 import re
 import time
 
@@ -124,6 +125,7 @@ def authenticate(domain_id):
     authenticating, receiving = domain_records.records(domain["name"], keys, address)
     return render_template(
         "domain.html", domain=domain, provider=provider, records=authenticating, receiving=receiving,
+        outbound_only=os.environ.get("SOMELESS_OUTBOUND_ONLY") == "1",
         celebrate=session.pop("celebrate", None) == domain_id,   # a check just found it all right (below)
         receive_note=domain_records.receive_note(domain["name"], keys),
         receive_tip=domain_records.receive_tip(domain["name"], keys),

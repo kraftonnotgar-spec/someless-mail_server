@@ -1,5 +1,7 @@
 """The server's name: what it greets other servers with, its certificate is for, apps connect
 to, and its reverse DNS should say. One of the authenticated domains' mail names."""
+import os
+
 from ..db import get_db
 from ..domain_records import HOST_CHOICES
 from . import state
@@ -12,6 +14,8 @@ def server_names():
 
 
 def server_name():
+    if os.environ.get("SOMELESS_OUTBOUND_ONLY") == "1" and os.environ.get("SOMELESS_SMTP_HOSTNAME"):
+        return os.environ["SOMELESS_SMTP_HOSTNAME"]
     names = server_names()
     chosen = state()["server_name"]
     return chosen if chosen in names else (names[0] if names else None)
